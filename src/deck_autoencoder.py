@@ -3,15 +3,46 @@ Denoising Autoencoder f├╝r MTG Deck-Empfehlungen
 
 Dieses Modell lernt die Struktur von Magic Decks und kann verwendet werden,
 um Deck-Vorschl├ñge zu generieren oder fehlende Karten zu empfehlen.
+
+GPU-Beschleunigung:
+- Unterst├╝tzt CUDA f├╝r NVIDIA GPUs
+- Mixed Precision Training f├╝r bessere Performance
+- Optimiertes DataLoader Setup
 """
 
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
+from torch.cuda.amp import autocast, GradScaler
 import numpy as np
 import pandas as pd
 from typing import Tuple, Optional
+
+
+def get_device(verbose: bool = True):
+    """
+    Ermittelt das beste verfürgbare Device (CUDA GPU oder CPU)
+    
+    Args:
+        verbose: Wenn True, gibt Geräte-Informationen aus
+    
+    Returns:
+        torch.device: Das zu verwendende Device
+    """
+    if torch.cuda.is_available():
+        device = torch.device('cuda')
+        if verbose:
+            print(f"✔  GPU verfügbar: {torch.cuda.get_device_name(0)}")
+            print(f"   CUDA Version: {torch.version.cuda}")
+            print(f"   GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.2f} GB")
+            print(f"   Aktuelle GPU Memory Nutzung: {torch.cuda.memory_allocated(0) / 1e9:.3f} GB")
+    else:
+        device = torch.device('cpu')
+        if verbose:
+            print("✘ Keine GPU verfügbar, nutze CPU")
+    
+    return device
 
 
 class DeckDataset(Dataset):
@@ -105,8 +136,9 @@ class DeckAutoencoder(nn.Module):
 class DeckRecommender:
     """Wrapper für das trainierte Modell für Deck-Empfehlungen"""
     
-    def __init__(self, model: DeckAutoencoder, card_metadata: pd.DataFrame):
-        self.model = model
+    def __init__(self, model: DeckAutoencoder, card_metadata: pd.DataFrame, device=None):
+        self.device = device if device is not None else get_device(verbose=False)
+        self.model = model.to(self.device)
         self.model.eval()
         self.metadata = card_metadata
         self.n_cards = len(card_metadata)
@@ -123,8 +155,8 @@ class DeckRecommender:
             DataFrame mit empfohlenen Karten und Scores
         """
         with torch.no_grad():
-            deck_tensor = torch.FloatTensor(partial_deck).unsqueeze(0)
-            reconstruction = self.model(deck_tensor).squeeze(0).numpy()
+            deck_tensor = torch.FloatTensor(partial_deck).unsqueeze(0).to(self.device)
+            reconstruction = self.model(deck_tensor).squeeze(0).cpu().numpy()
         
         # Entferne bereits vorhandene Karten
         reconstruction[partial_deck == 1] = 0
@@ -158,8 +190,8 @@ class DeckRecommender:
         """
         with torch.no_grad():
             # Encode alle Decks
-            deck_tensor = torch.FloatTensor(deck).unsqueeze(0)
-            all_decks_tensor = torch.FloatTensor(all_decks)
+            deck_tensor = torch.FloatTensor(deck).unsqueeze(0).to(self.device)
+            all_decks_tensor = torch.FloatTensor(all_decks).to(self.device)
             
             deck_embedding = self.model.encode(deck_tensor)
             all_embeddings = self.model.encode(all_decks_tensor)
@@ -168,7 +200,7 @@ class DeckRecommender:
             distances = torch.cdist(deck_embedding, all_embeddings).squeeze(0)
             
             # Top-K ├ñhnliche Decks
-            top_indices = torch.argsort(distances)[:top_k].numpy()
+            top_indices = torch.argsort(distances)[:top_k].cpu().numpy()
         
         return top_indices
 
@@ -190,50 +222,98 @@ def create_sample_deck_matrix(n_decks: int, n_cards: int,
 
 
 def train_autoencoder(model: DeckAutoencoder, train_loader: DataLoader, 
-                     n_epochs: int = 50, lr: float = 0.001) -> list:
+                     n_epochs: int = 50, lr: float = 0.001, 
+                     use_amp: bool = True, device=None) -> list:
     """
-    Trainiert den Autoencoder
+    Trainiert den Autoencoder mit GPU-Unterst├╝tzung
+    
+    Args:
+        model: Das zu trainierende Modell
+        train_loader: DataLoader mit Trainingsdaten
+        n_epochs: Anzahl der Trainings-Epochen
+        lr: Learning Rate
+        use_amp: Nutze Automatic Mixed Precision f├╝r schnelleres Training (nur GPU)
+        device: Device zum Training (None = automatisch ermitteln)
     
     Returns:
         Liste mit Loss-Werten pro Epoch
     """
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # Device Setup
+    if device is None:
+        device = get_device(verbose=True)
+    
     model = model.to(device)
+    
+    # Mixed Precision nur auf GPU verwenden
+    use_amp = use_amp and torch.cuda.is_available()
+    if use_amp:
+        print("ÔťĽ Mixed Precision Training aktiviert")
+        scaler = GradScaler()
     
     criterion = nn.BCELoss()
     optimizer = optim.Adam(model.parameters(), lr=lr)
     
     losses = []
     
+    print(f"\nStarte Training auf {device}...")
+    print(f"Epochen: {n_epochs}, Batch Size: {train_loader.batch_size}, Learning Rate: {lr}\n")
+    
     for epoch in range(n_epochs):
+        model.train()
         epoch_loss = 0
+        n_batches = len(train_loader)
         
-        for noisy_deck, clean_deck in train_loader:
+        for batch_idx, (noisy_deck, clean_deck) in enumerate(train_loader):
             noisy_deck = noisy_deck.to(device)
             clean_deck = clean_deck.to(device)
             
-            # Forward pass
-            reconstructed = model(noisy_deck)
-            loss = criterion(reconstructed, clean_deck)
-            
-            # Backward pass
             optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+            
+            if use_amp:
+                # Mixed Precision Training
+                with autocast():
+                    reconstructed = model(noisy_deck)
+                    loss = criterion(reconstructed, clean_deck)
+                
+                scaler.scale(loss).backward()
+                scaler.step(optimizer)
+                scaler.update()
+            else:
+                # Standard Training
+                reconstructed = model(noisy_deck)
+                loss = criterion(reconstructed, clean_deck)
+                loss.backward()
+                optimizer.step()
             
             epoch_loss += loss.item()
         
-        avg_loss = epoch_loss / len(train_loader)
+        avg_loss = epoch_loss / n_batches
         losses.append(avg_loss)
         
-        if (epoch + 1) % 10 == 0:
-            print(f"Epoch [{epoch+1}/{n_epochs}], Loss: {avg_loss:.4f}")
+        # Ausgabe alle 10 Epochen oder bei letzter Epoche
+        if (epoch + 1) % 10 == 0 or epoch == n_epochs - 1:
+            if torch.cuda.is_available():
+                gpu_mem = torch.cuda.memory_allocated(device) / 1e9
+                print(f"Epoch [{epoch+1:3d}/{n_epochs}] | Loss: {avg_loss:.4f} | GPU Memory: {gpu_mem:.2f} GB")
+            else:
+                print(f"Epoch [{epoch+1:3d}/{n_epochs}] | Loss: {avg_loss:.4f}")
+    
+    # GPU Memory freigeben
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
     
     return losses
 
 
 if __name__ == "__main__":
-    print("=== MTG Deck Autoencoder Demo ===\n")
+    print("=" * 60)
+    print("MTG Deck Autoencoder - GPU-beschleunigtes Training")
+    print("=" * 60)
+    print()
+    
+    # Device ermitteln
+    device = get_device(verbose=True)
+    print()
     
     # Lade Embeddings
     print("Lade Card Embeddings...")
@@ -246,13 +326,24 @@ if __name__ == "__main__":
     # Erstelle Sample Deck Daten
     # In der Praxis: Lade echte Deck-Listen hier
     print("\nErstelle Sample Deck Daten...")
-    n_decks = 100
+    n_decks = 1000  # Mehr Decks f├╝r besseres Training
     deck_matrix = create_sample_deck_matrix(n_decks, n_cards, deck_size=60)
     print(f"Anzahl Sample Decks: {n_decks}")
     
-    # Dataset und DataLoader
+    # Dataset und DataLoader mit GPU-Optimierungen
     dataset = DeckDataset(deck_matrix, noise_factor=0.2)
-    train_loader = DataLoader(dataset, batch_size=16, shuffle=True)
+    
+    # Gr├Â├čere Batch Size f├╝r GPU, kleinere f├╝r CPU
+    batch_size = 64 if torch.cuda.is_available() else 16
+    
+    # pin_memory und num_workers f├╝r schnelleren GPU-Transfer
+    train_loader = DataLoader(
+        dataset, 
+        batch_size=batch_size, 
+        shuffle=True,
+        num_workers=2 if torch.cuda.is_available() else 0,
+        pin_memory=torch.cuda.is_available()
+    )
     
     # Modell erstellen
     print("\nErstelle Autoencoder Modell...")
@@ -262,11 +353,19 @@ if __name__ == "__main__":
         hidden_dims=[1024, 512, 256]
     )
     
-    print(f"Modell Parameter: {sum(p.numel() for p in model.parameters()):,}")
+    n_params = sum(p.numel() for p in model.parameters())
+    print(f"Modell Parameter: {n_params:,}")
+    print(f"Modell Gr├Â├če: ~{n_params * 4 / 1e6:.1f} MB (FP32)")
     
-    # Training
-    print("\nStarte Training...")
-    losses = train_autoencoder(model, train_loader, n_epochs=20, lr=0.001)
+    # Training mit GPU-Unterst├╝tzung
+    losses = train_autoencoder(
+        model, 
+        train_loader, 
+        n_epochs=50,  # Mehr Epochen da wir GPU haben
+        lr=0.001,
+        use_amp=True,  # Mixed Precision f├╝r schnelleres Training
+        device=device
+    )
     
     # Speichere Modell
     print("\nSpeichere trainiertes Modell...")
@@ -274,10 +373,14 @@ if __name__ == "__main__":
         'model_state_dict': model.state_dict(),
         'n_cards': n_cards,
         'embedding_dim': 128,
+        'hidden_dims': [1024, 512, 256],
     }, 'data/embeddings/deck_autoencoder.pth')
     
-    print("\n=== Training abgeschlossen! ===")
+    print("\n" + "=" * 60)
+    print("Training abgeschlossen!")
+    print("=" * 60)
     print("\nN├ñchste Schritte:")
     print("1. Lade echte Deck-Daten (z.B. von MTGO, Arena, oder Turnieren)")
     print("2. Trainiere das Modell mit echten Decks")
     print("3. Nutze DeckRecommender f├╝r Empfehlungen")
+    print(f"4. Modell gespeichert unter: data/embeddings/deck_autoencoder.pth")
