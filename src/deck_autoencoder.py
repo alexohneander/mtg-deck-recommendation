@@ -115,7 +115,9 @@ class DeckAutoencoder(nn.Module):
         
         decoder_layers.extend([
             nn.Linear(prev_dim, n_cards),
-            nn.Sigmoid()  # Output zwischen 0 und 1
+            # Ausgabe als Logits (nicht mit Sigmoid aktivieren).
+            # Wir verwenden BCEWithLogitsLoss während des Trainings
+            # und wenden Sigmoid nur bei der Inferenz an.
         ])
         self.decoder = nn.Sequential(*decoder_layers)
     
@@ -156,7 +158,8 @@ class DeckRecommender:
         """
         with torch.no_grad():
             deck_tensor = torch.FloatTensor(partial_deck).unsqueeze(0).to(self.device)
-            reconstruction = self.model(deck_tensor).squeeze(0).cpu().numpy()
+            # Modell gibt Logits zurück; wandle in Wahrscheinlichkeiten um
+            reconstruction = torch.sigmoid(self.model(deck_tensor)).squeeze(0).cpu().numpy()
         
         # Entferne bereits vorhandene Karten
         reconstruction[partial_deck == 1] = 0
@@ -250,7 +253,8 @@ def train_autoencoder(model: DeckAutoencoder, train_loader: DataLoader,
         print("ÔťĽ Mixed Precision Training aktiviert")
         scaler = GradScaler()
     
-    criterion = nn.BCELoss()
+    # Verwende numerisch stabile Variante, die Logits erwartet
+    criterion = nn.BCEWithLogitsLoss()
     optimizer = optim.Adam(model.parameters(), lr=lr)
     
     losses = []

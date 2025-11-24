@@ -1,15 +1,15 @@
 # MTG Card Embedding Indexer
 
-Dieses System erstellt Vektorrepr├ñsentationen (Embeddings) von Magic The Gathering Karten aus der AllPrintings.sqlite Datenbank, um sie f├╝r Machine Learning Modelle wie Denoising Autoencoder nutzbar zu machen.
+Dieses System erstellt Vektorrepräsentationen (Embeddings) von Magic The Gathering Karten aus der AllPrintings.sqlite Datenbank, um sie für Machine Learning Modelle wie Denoising Autoencoder nutzbar zu machen.
 
-## ├£bersicht
+## Übersicht
 
-Das System extrahiert relevante Features aus jeder Karte und erstellt numerische Vektoren, die f├╝r:
+Das System extrahiert relevante Features aus jeder Karte und erstellt numerische Vektoren, die für:
 - Denoising Autoencoder Training
 - Deck-Empfehlungssysteme
-- Kartensuche und ├ähnlichkeitsanalysen
+- Kartensuche und Ähnlichkeitsanalysen
 
-genutzt werden k├╢nnen.
+genutzt werden können.
 
 ## Extrahierte Features
 
@@ -24,7 +24,7 @@ Jede Karte wird in einen **33-dimensionalen** Feature-Vektor umgewandelt:
 - Converted Mana Cost (CMC)
 
 ### 3. Color Identity (6)
-- One-hot Encoding f├╝r W, U, B, R, G, Colorless
+- One-hot Encoding für W, U, B, R, G, Colorless
 
 ### 4. Card Types (8)
 - Binary Features: Creature, Instant, Sorcery, Enchantment, Artifact, Planeswalker, Land, Battle
@@ -97,12 +97,12 @@ print(f"Erste Karte: {metadata.iloc[0]['name']}")
 print(f"Embedding: {embeddings[0]}")
 ```
 
-## N├ñchste Schritte: Denoising Autoencoder
+## Nächste Schritte: Denoising Autoencoder
 
-Die erstellten Embeddings k├╢nnen f├╝r einen Denoising Autoencoder verwendet werden:
+Die erstellten Embeddings können für einen Denoising Autoencoder verwendet werden:
 
 1. **Deck-Daten sammeln**: Lade fertige Pro-Decks (z.B. von MTGO, Arena, oder Tournament-Daten)
-2. **Deck-Matrix erstellen**: Erstelle bin├ñre Vektoren die repr├ñsentieren welche Karten in einem Deck sind
+2. **Deck-Matrix erstellen**: Erstelle binäre Vektoren die repräsentieren welche Karten in einem Deck sind
 3. **Autoencoder trainieren**: 
    - Input: Deck-Vektor mit "Noise"
    - Output: Originales Deck
@@ -150,7 +150,7 @@ class DeckAutoencoder(nn.Module):
 
 - **Verarbeitungsgeschwindigkeit**: ~1000-2000 Karten/Sekunde
 - **Speicherbedarf**: ~14MB f├╝r 107.000 Karten (float32)
-- **Vollst├ñndige Indexierung**: ~60-120 Sekunden
+- **Vollständige Indexierung**: ~60-120 Sekunden
 
 ## Datenbank Schema
 

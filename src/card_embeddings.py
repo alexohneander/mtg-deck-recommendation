@@ -1,6 +1,6 @@
 """
 MTG Card Embedding Generator
-Erstellt Vektorrepr├ñsentationen von Magic The Gathering Karten f├╝r ML-Modelle
+Erstellt Vektorrepräsentationen von Magic The Gathering Karten für ML-Modelle
 """
 
 import sqlite3
@@ -13,7 +13,7 @@ import re
 
 
 class MTGCardEmbedder:
-    """Klasse zum Erstellen von Feature-Vektoren f├╝r MTG Karten"""
+    """Klasse zum Erstellen von Feature-Vektoren für MTG Karten"""
     
     def __init__(self, db_path: str = 'data/AllPrintings.sqlite'):
         self.db_path = db_path
@@ -30,7 +30,7 @@ class MTGCardEmbedder:
     
     def parse_mana_cost(self, mana_cost: Optional[str]) -> Dict[str, int]:
         """
-        Parst Mana-Kosten und gibt ein Dictionary zur├╝ck
+        Parst Mana-Kosten und gibt ein Dictionary zurück
         Beispiel: "{2}{W}{U}" -> {'generic': 2, 'W': 1, 'U': 1}
         """
         if not mana_cost or pd.isna(mana_cost):
@@ -88,7 +88,7 @@ class MTGCardEmbedder:
         # 2. Mana Value / CMC (1 feature)
         features.append(card_row.get('manaValue', 0) if pd.notna(card_row.get('manaValue')) else 0)
         
-        # 3. Color Identity (6 features: one-hot f├╝r W, U, B, R, G, colorless)
+        # 3. Color Identity (6 features: one-hot für W, U, B, R, G, colorless)
         color_identity = self.parse_json_field(card_row.get('colorIdentity'))
         color_vector = [0, 0, 0, 0, 0, 0]
         if not color_identity:
@@ -99,7 +99,7 @@ class MTGCardEmbedder:
                     color_vector[self.color_map[color]] = 1
         features.extend(color_vector)
         
-        # 4. Card Types (Binary features f├╝r Creature, Instant, Sorcery, etc.)
+        # 4. Card Types (Binary features für Creature, Instant, Sorcery, etc.)
         card_types = self.parse_json_field(card_row.get('types'))
         type_features = {
             'Creature': 0, 'Instant': 0, 'Sorcery': 0, 'Enchantment': 0,
@@ -126,7 +126,7 @@ class MTGCardEmbedder:
             
         features.extend([power_val, toughness_val])
         
-        # 6. Loyalty (1 feature, f├╝r Planeswalker)
+        # 6. Loyalty (1 feature, für Planeswalker)
         loyalty = card_row.get('loyalty', '0')
         try:
             loyalty_val = float(loyalty) if loyalty and loyalty != 'X' else 0
@@ -144,7 +144,7 @@ class MTGCardEmbedder:
         ]
         features.extend(rarity_vector)
         
-        # 8. Keywords (wird sp├ñter mit TF-IDF erweitert, vorerst count)
+        # 8. Keywords (wird später mit TF-IDF erweitert, vorerst count)
         keywords = self.parse_json_field(card_row.get('keywords'))
         features.append(len(keywords))
         
@@ -158,8 +158,8 @@ class MTGCardEmbedder:
     
     def build_vocabularies(self, sample_size: int = 10000):
         """
-        Baut Vokabulare f├╝r Keywords, Subtypes etc. auf
-        Sample_size begrenzt die Anzahl der Karten f├╝r schnelleres Processing
+        Baut Vokabulare für Keywords, Subtypes etc. auf
+        Sample_size begrenzt die Anzahl der Karten für schnelleres Processing
         """
         conn = self.connect_db()
         
@@ -196,7 +196,7 @@ class MTGCardEmbedder:
         print(f"  - {len(self.type_vocab)} Types")
     
     def get_feature_names(self) -> List[str]:
-        """Gibt die Namen aller Features zur├╝ck"""
+        """Gibt die Namen aller Features zurück"""
         names = [
             # Mana costs
             'mana_generic', 'mana_W', 'mana_U', 'mana_B', 'mana_R', 'mana_G', 'mana_C',
@@ -254,7 +254,7 @@ class MTGCardEmbedder:
             if len(df_batch) == 0:
                 break
             
-            # Embeddings f├╝r diesen Batch erstellen
+            # Embeddings für diesen Batch erstellen
             batch_embeddings = []
             batch_metadata = []
             
@@ -314,7 +314,7 @@ class MTGCardEmbedder:
         print(f"Feature Names gespeichert: {feature_names_path}")
     
     def load_embeddings(self, input_dir: str = 'data/embeddings') -> Tuple[np.ndarray, pd.DataFrame]:
-        """L├ñdt gespeicherte Embeddings und Metadata"""
+        """Lädt gespeicherte Embeddings und Metadata"""
         embeddings = np.load(os.path.join(input_dir, 'card_embeddings.npy'))
         metadata = pd.read_csv(os.path.join(input_dir, 'card_metadata.csv'))
         return embeddings, metadata
@@ -328,10 +328,10 @@ if __name__ == "__main__":
     embedder.build_vocabularies(sample_size=10000)
     
     print("\nVerarbeite Karten und erstelle Embeddings...")
-    # F├╝r Tests: nur 1000 Karten
+    # Für Tests: nur 1000 Karten
     embeddings, metadata = embedder.process_all_cards(limit=1000)
     
     print("\nSpeichere Embeddings...")
     embedder.save_embeddings(embeddings, metadata)
     
-    print("\nFertig! Die Embeddings sind bereit f├╝r den Denoising Autoencoder.")
+    print("\nFertig! Die Embeddings sind bereit für den Denoising Autoencoder.")
