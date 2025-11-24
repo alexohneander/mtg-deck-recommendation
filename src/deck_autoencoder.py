@@ -1,13 +1,13 @@
 """
-Denoising Autoencoder f├╝r MTG Deck-Empfehlungen
+Denoising Autoencoder for MTG deck recommendations
 
-Dieses Modell lernt die Struktur von Magic Decks und kann verwendet werden,
-um Deck-Vorschl├ñge zu generieren oder fehlende Karten zu empfehlen.
+This model learns the structure of Magic decks and can be used
+to generate deck suggestions or recommend missing cards.
 
-GPU-Beschleunigung:
-- Unterst├╝tzt CUDA f├╝r NVIDIA GPUs
-- Mixed Precision Training f├╝r bessere Performance
-- Optimiertes DataLoader Setup
+GPU acceleration:
+- Supports CUDA for NVIDIA GPUs
+- Mixed precision training for better performance
+- Optimized DataLoader setup
 """
 
 import torch
@@ -22,37 +22,37 @@ from typing import Tuple, Optional
 
 def get_device(verbose: bool = True):
     """
-    Ermittelt das beste verfürgbare Device (CUDA GPU oder CPU)
-    
+    Determine the best available device (CUDA GPU or CPU)
+
     Args:
-        verbose: Wenn True, gibt Geräte-Informationen aus
-    
+        verbose: If True, print device information
+
     Returns:
-        torch.device: Das zu verwendende Device
+        torch.device: The device to use
     """
     if torch.cuda.is_available():
         device = torch.device('cuda')
         if verbose:
-            print(f"✔  GPU verfügbar: {torch.cuda.get_device_name(0)}")
+            print(f"✔  GPU available: {torch.cuda.get_device_name(0)}")
             print(f"   CUDA Version: {torch.version.cuda}")
             print(f"   GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.2f} GB")
-            print(f"   Aktuelle GPU Memory Nutzung: {torch.cuda.memory_allocated(0) / 1e9:.3f} GB")
+            print(f"   Current GPU memory usage: {torch.cuda.memory_allocated(0) / 1e9:.3f} GB")
     else:
         device = torch.device('cpu')
         if verbose:
-            print("✘ Keine GPU verfügbar, nutze CPU")
-    
+            print("✘ No GPU available, using CPU")
+
     return device
 
 
 class DeckDataset(Dataset):
-    """Dataset für MTG Decks"""
-    
+    """Dataset for MTG decks"""
+
     def __init__(self, deck_matrices: np.ndarray, noise_factor: float = 0.2):
         """
         Args:
-            deck_matrices: Binary matrix (n_decks, n_cards) wo 1 = Karte ist im Deck
-            noise_factor: Anteil der Karten die für Denoising entfernt werden
+            deck_matrices: Binary matrix (n_decks, n_cards) where 1 = card is in deck
+            noise_factor: Fraction of cards removed for denoising
         """
         self.decks = torch.FloatTensor(deck_matrices)
         self.noise_factor = noise_factor
@@ -63,7 +63,7 @@ class DeckDataset(Dataset):
     def __getitem__(self, idx):
         clean_deck = self.decks[idx]
         
-        # Noise hinzuf├╝gen: zuf├ñllig Karten entfernen
+        # Add noise: randomly remove cards
         noisy_deck = clean_deck.clone()
         mask = torch.rand_like(noisy_deck) > self.noise_factor
         noisy_deck = noisy_deck * mask
@@ -72,22 +72,22 @@ class DeckDataset(Dataset):
 
 
 class DeckAutoencoder(nn.Module):
-    """Denoising Autoencoder für MTG Decks"""
-    
+    """Denoising autoencoder for MTG decks"""
+
     def __init__(self, n_cards: int, embedding_dim: int = 128, 
                  hidden_dims: list = [1024, 512, 256]):
         """
         Args:
-            n_cards: Anzahl verschiedener Karten
-            embedding_dim: Dimension des Latent Space
-            hidden_dims: Dimensionen der Hidden Layers
+            n_cards: Number of distinct cards
+            embedding_dim: Dimension of the latent space
+            hidden_dims: Dimensions of the hidden layers
         """
         super(DeckAutoencoder, self).__init__()
-        
+
         # Encoder
         encoder_layers = []
         prev_dim = n_cards
-        
+
         for hidden_dim in hidden_dims:
             encoder_layers.extend([
                 nn.Linear(prev_dim, hidden_dim),
@@ -96,14 +96,14 @@ class DeckAutoencoder(nn.Module):
                 nn.Dropout(0.2)
             ])
             prev_dim = hidden_dim
-        
+
         encoder_layers.append(nn.Linear(prev_dim, embedding_dim))
         self.encoder = nn.Sequential(*encoder_layers)
-        
+
         # Decoder
         decoder_layers = []
         prev_dim = embedding_dim
-        
+
         for hidden_dim in reversed(hidden_dims):
             decoder_layers.extend([
                 nn.Linear(prev_dim, hidden_dim),
@@ -112,12 +112,12 @@ class DeckAutoencoder(nn.Module):
                 nn.Dropout(0.2)
             ])
             prev_dim = hidden_dim
-        
+
         decoder_layers.extend([
             nn.Linear(prev_dim, n_cards),
-            # Ausgabe als Logits (nicht mit Sigmoid aktivieren).
-            # Wir verwenden BCEWithLogitsLoss während des Trainings
-            # und wenden Sigmoid nur bei der Inferenz an.
+            # Output as logits (do not apply Sigmoid here).
+            # We use BCEWithLogitsLoss during training
+            # and apply Sigmoid only at inference time.
         ])
         self.decoder = nn.Sequential(*decoder_layers)
     
@@ -127,46 +127,46 @@ class DeckAutoencoder(nn.Module):
         return decoded
     
     def encode(self, x):
-        """Encode ein Deck in den Latent Space"""
+        """Encode a deck into the latent space"""
         return self.encoder(x)
-    
+
     def decode(self, z):
-        """Decode einen Latent Vector zu einem Deck"""
+        """Decode a latent vector into a deck"""
         return self.decoder(z)
 
 
 class DeckRecommender:
-    """Wrapper für das trainierte Modell für Deck-Empfehlungen"""
-    
+    """Wrapper for the trained model used for deck recommendations"""
+
     def __init__(self, model: DeckAutoencoder, card_metadata: pd.DataFrame, device=None):
         self.device = device if device is not None else get_device(verbose=False)
         self.model = model.to(self.device)
         self.model.eval()
         self.metadata = card_metadata
         self.n_cards = len(card_metadata)
-    
+
     def recommend_cards(self, partial_deck: np.ndarray, top_k: int = 10) -> pd.DataFrame:
         """
-        Empfiehlt Karten basierend auf einem unvollständigen Deck
-        
+        Recommend cards based on a partial/incomplete deck
+
         Args:
-            partial_deck: Binary vector (n_cards,) mit 1 für vorhandene Karten
-            top_k: Anzahl der Empfehlungen
-        
+            partial_deck: Binary vector (n_cards,) with 1 for cards already present
+            top_k: Number of recommendations
+
         Returns:
-            DataFrame mit empfohlenen Karten und Scores
+            DataFrame with recommended cards and scores
         """
         with torch.no_grad():
             deck_tensor = torch.FloatTensor(partial_deck).unsqueeze(0).to(self.device)
-            # Modell gibt Logits zurück; wandle in Wahrscheinlichkeiten um
+            # Model returns logits; convert to probabilities
             reconstruction = torch.sigmoid(self.model(deck_tensor)).squeeze(0).cpu().numpy()
-        
-        # Entferne bereits vorhandene Karten
+
+        # Remove cards already present
         reconstruction[partial_deck == 1] = 0
-        
-        # Top-K Karten
+
+        # Top-K cards
         top_indices = np.argsort(reconstruction)[-top_k:][::-1]
-        
+
         recommendations = []
         for idx in top_indices:
             recommendations.append({
@@ -175,52 +175,52 @@ class DeckRecommender:
                 'manaCost': self.metadata.iloc[idx]['manaCost'],
                 'type': self.metadata.iloc[idx]['type']
             })
-        
+
         return pd.DataFrame(recommendations)
-    
+
     def find_similar_decks(self, deck: np.ndarray, all_decks: np.ndarray, 
                           top_k: int = 5) -> np.ndarray:
         """
-        Findet ähnliche Decks basierend auf Latent Space Distance
-        
+        Find similar decks based on latent space distance
+
         Args:
-            deck: Binary vector des Referenz-Decks
-            all_decks: Matrix aller Decks (n_decks, n_cards)
-            top_k: Anzahl ├ñhnlicher Decks
-        
+            deck: Binary vector of the reference deck
+            all_decks: Matrix of all decks (n_decks, n_cards)
+            top_k: Number of similar decks to return
+
         Returns:
-            Indices der ├ñhnlichsten Decks
+            Indices of the most similar decks
         """
         with torch.no_grad():
-            # Encode alle Decks
+            # Encode decks
             deck_tensor = torch.FloatTensor(deck).unsqueeze(0).to(self.device)
             all_decks_tensor = torch.FloatTensor(all_decks).to(self.device)
-            
+
             deck_embedding = self.model.encode(deck_tensor)
             all_embeddings = self.model.encode(all_decks_tensor)
-            
-            # Berechne Distanzen
+
+            # Compute distances
             distances = torch.cdist(deck_embedding, all_embeddings).squeeze(0)
-            
-            # Top-K ├ñhnliche Decks
+
+            # Top-K similar decks
             top_indices = torch.argsort(distances)[:top_k].cpu().numpy()
-        
+
         return top_indices
 
 
 def create_sample_deck_matrix(n_decks: int, n_cards: int, 
                              deck_size: int = 60) -> np.ndarray:
     """
-    Erstellt Sample Deck Daten für Tests
-    In der Praxis würden hier echte Deck-Listen geladen werden
+    Create sample deck data for testing
+    In practice: load real deck lists here
     """
     deck_matrix = np.zeros((n_decks, n_cards), dtype=np.float32)
-    
+
     for i in range(n_decks):
-        # Zuf├ñllige Karten f├╝r jedes Deck
+        # Random cards for each deck
         card_indices = np.random.choice(n_cards, deck_size, replace=False)
         deck_matrix[i, card_indices] = 1
-    
+
     return deck_matrix
 
 
@@ -228,84 +228,84 @@ def train_autoencoder(model: DeckAutoencoder, train_loader: DataLoader,
                      n_epochs: int = 50, lr: float = 0.001, 
                      use_amp: bool = True, device=None) -> list:
     """
-    Trainiert den Autoencoder mit GPU-Unterst├╝tzung
-    
+    Train the autoencoder with optional GPU support
+
     Args:
-        model: Das zu trainierende Modell
-        train_loader: DataLoader mit Trainingsdaten
-        n_epochs: Anzahl der Trainings-Epochen
-        lr: Learning Rate
-        use_amp: Nutze Automatic Mixed Precision f├╝r schnelleres Training (nur GPU)
-        device: Device zum Training (None = automatisch ermitteln)
-    
+        model: The model to train
+        train_loader: DataLoader with training data
+        n_epochs: Number of training epochs
+        lr: Learning rate
+        use_amp: Use automatic mixed precision for faster training (GPU only)
+        device: Device to train on (None = auto-detect)
+
     Returns:
-        Liste mit Loss-Werten pro Epoch
+        List of loss values per epoch
     """
-    # Device Setup
+    # Device setup
     if device is None:
         device = get_device(verbose=True)
-    
+
     model = model.to(device)
-    
-    # Mixed Precision nur auf GPU verwenden
+
+    # Use mixed precision only on GPU
     use_amp = use_amp and torch.cuda.is_available()
     if use_amp:
-        print("ÔťĽ Mixed Precision Training aktiviert")
+        print("Mixed Precision training enabled")
         scaler = GradScaler()
-    
-    # Verwende numerisch stabile Variante, die Logits erwartet
+
+    # Use numerically stable variant that expects logits
     criterion = nn.BCEWithLogitsLoss()
     optimizer = optim.Adam(model.parameters(), lr=lr)
-    
+
     losses = []
-    
-    print(f"\nStarte Training auf {device}...")
-    print(f"Epochen: {n_epochs}, Batch Size: {train_loader.batch_size}, Learning Rate: {lr}\n")
-    
+
+    print(f"\nStarting training on {device}...")
+    print(f"Epochs: {n_epochs}, Batch Size: {train_loader.batch_size}, Learning Rate: {lr}\n")
+
     for epoch in range(n_epochs):
         model.train()
         epoch_loss = 0
         n_batches = len(train_loader)
-        
+
         for batch_idx, (noisy_deck, clean_deck) in enumerate(train_loader):
             noisy_deck = noisy_deck.to(device)
             clean_deck = clean_deck.to(device)
-            
+
             optimizer.zero_grad()
-            
+
             if use_amp:
-                # Mixed Precision Training
+                # Mixed precision training
                 with autocast():
                     reconstructed = model(noisy_deck)
                     loss = criterion(reconstructed, clean_deck)
-                
+
                 scaler.scale(loss).backward()
                 scaler.step(optimizer)
                 scaler.update()
             else:
-                # Standard Training
+                # Standard training
                 reconstructed = model(noisy_deck)
                 loss = criterion(reconstructed, clean_deck)
                 loss.backward()
                 optimizer.step()
-            
+
             epoch_loss += loss.item()
-        
+
         avg_loss = epoch_loss / n_batches
         losses.append(avg_loss)
-        
-        # Ausgabe alle 10 Epochen oder bei letzter Epoche
+
+        # Print every 10 epochs or on the final epoch
         if (epoch + 1) % 10 == 0 or epoch == n_epochs - 1:
             if torch.cuda.is_available():
                 gpu_mem = torch.cuda.memory_allocated(device) / 1e9
                 print(f"Epoch [{epoch+1:3d}/{n_epochs}] | Loss: {avg_loss:.4f} | GPU Memory: {gpu_mem:.2f} GB")
             else:
                 print(f"Epoch [{epoch+1:3d}/{n_epochs}] | Loss: {avg_loss:.4f}")
-    
-    # GPU Memory freigeben
+
+    # Free GPU memory
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
-    
+
     return losses
 
 
@@ -349,7 +349,7 @@ if __name__ == "__main__":
         pin_memory=torch.cuda.is_available()
     )
     
-    # Modell erstellen
+    # Create model
     print("\nCreating autoencoder model...")
     model = DeckAutoencoder(
         n_cards=n_cards,
@@ -361,17 +361,17 @@ if __name__ == "__main__":
     print(f"Model parameters: {n_params:,}")
     print(f"Model size: ~{n_params * 4 / 1e6:.1f} MB (FP32)")
     
-    # Training mit GPU-Unterst├╝tzung
+    # Training with GPU support
     losses = train_autoencoder(
         model, 
         train_loader, 
-        n_epochs=50,  # Mehr Epochen da wir GPU haben
+        n_epochs=50,  # More epochs since we have a GPU
         lr=0.001,
         use_amp=True,  # Mixed precision for faster training
         device=device
     )
     
-    # Speichere Modell
+    # Save model
     print("\nSaving trained model...")
     torch.save({
         'model_state_dict': model.state_dict(),
