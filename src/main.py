@@ -1,6 +1,6 @@
 """
 MTG Deck Recommendation System - Main CLI
-Zentrales Command-Line Interface für alle Workflow-Schritte
+Central command-line interface for all workflow steps
 """
 
 import argparse
@@ -8,7 +8,7 @@ import sys
 import os
 from pathlib import Path
 
-# Füge src Verzeichnis zum Python Path hinzu
+# Add src directory to Python path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from card_embeddings import MTGCardEmbedder
@@ -29,140 +29,140 @@ import time
 
 
 def cmd_index_cards(args):
-    """Indexiert MTG Karten und erstellt Embeddings"""
+    """Index MTG cards and create embeddings"""
     print("=" * 70)
-    print("STEP 1: Card Indexierung")
+    print("STEP 1: Card Indexing")
     print("=" * 70)
     
     embedder = MTGCardEmbedder(db_path=args.db_path)
     
-    # Vokabulare aufbauen
-    print("\n[1/3] Erstelle Vokabulare...")
+    # Build vocabularies
+    print("\n[1/3] Building vocabularies...")
     start_time = time.time()
     embedder.build_vocabularies(sample_size=args.sample_vocab)
     vocab_time = time.time() - start_time
-    print(f"✓ Vokabular erstellt in {vocab_time:.2f}s")
+    print(f"✓ Vocabulary created in {vocab_time:.2f}s")
     
-    # Embeddings erstellen
-    print("\n[2/3] Verarbeite Karten und erstelle Embeddings...")
+    # Create embeddings
+    print("\n[2/3] Processing cards and creating embeddings...")
     start_time = time.time()
     embeddings, metadata = embedder.process_all_cards(
         batch_size=args.batch_size,
         limit=args.limit
     )
     processing_time = time.time() - start_time
-    print(f"✓ {len(metadata):,} Karten verarbeitet in {processing_time:.2f}s")
-    print(f"  ({len(metadata) / processing_time:.1f} Karten/Sekunde)")
+    print(f"✓ {len(metadata):,} cards processed in {processing_time:.2f}s")
+    print(f"  ({len(metadata) / processing_time:.1f} cards/second)")
     
-    # Embeddings speichern
-    print("\n[3/3] Speichere Embeddings...")
+    # Save embeddings
+    print("\n[3/3] Saving embeddings...")
     embedder.save_embeddings(embeddings, metadata, output_dir=args.output_dir)
     
     print("\n" + "=" * 70)
-    print("✓ Indexierung abgeschlossen!")
-    print(f"  Anzahl Karten:       {len(metadata):,}")
-    print(f"  Feature Dimensionen: {embeddings.shape[1]}")
-    print(f"  Output Verzeichnis:  {args.output_dir}")
+    print("✓ Indexing completed!")
+    print(f"  Number of cards:     {len(metadata):,}")
+    print(f"  Feature dimensions:  {embeddings.shape[1]}")
+    print(f"  Output directory:    {args.output_dir}")
     print("=" * 70)
 
 
 def cmd_create_sample_decks(args):
-    """Erstellt Beispiel Deck-Dateien"""
+    """Creates example deck files"""
     print("=" * 70)
-    print("STEP 2: Beispiel Decks erstellen")
+    print("STEP 2: Create Sample Decks")
     print("=" * 70)
     
     create_example_decklists()
     
-    print("\n✓ Beispiel Decks erstellt in data/sample_decks/")
+    print("\n✓ Sample decks created in data/sample_decks/")
     print("  - mono_red.txt")
     print("  - blue_control.txt")
-    print("\nDu kannst jetzt eigene Decks im gleichen Format hinzufügen!")
+    print("\nYou can now add your own decks in the same format!")
 
 
 def cmd_load_decks(args):
-    """Lädt Deck-Daten und konvertiert sie zu Vektoren"""
+    """Loads deck data and converts them to vectors"""
     print("=" * 70)
-    print("STEP 3: Deck-Daten laden")
+    print("STEP 3: Load Deck Data")
     print("=" * 70)
     
-    # Lade Metadata
-    print("\nLade Card Metadata...")
+    # Load metadata
+    print("\nLoading card metadata...")
     metadata = pd.read_csv(os.path.join(args.embeddings_dir, 'card_metadata.csv'))
-    print(f"✓ {len(metadata):,} Karten geladen")
+    print(f"✓ {len(metadata):,} cards loaded")
     
-    # Erstelle Loader
+    # Create loader
     loader = DeckLoader(metadata)
     
-    # Finde alle Deck-Dateien
+    # Find all deck files
     deck_files = []
     deck_dir = Path(args.deck_dir)
     
     if deck_dir.exists():
         deck_files = list(deck_dir.glob('*.txt'))
-        print(f"\n✓ {len(deck_files)} Deck-Dateien gefunden in {args.deck_dir}")
+        print(f"\n✓ {len(deck_files)} deck files found in {args.deck_dir}")
     else:
-        print(f"\n⚠ Verzeichnis {args.deck_dir} existiert nicht!")
-        print("  Erstelle erst Beispiel-Decks mit: python src/main.py create-samples")
+        print(f"\n⚠ Directory {args.deck_dir} does not exist!")
+        print("  Create sample decks first with: python src/main.py create-samples")
         return
     
-    # Lade Decks
+    # Load decks
     if deck_files:
-        print("\nLade Decks...")
+        print("\nLoading decks...")
         deck_matrix = loader.load_multiple_decks(
             [str(f) for f in deck_files],
             use_counts=args.use_counts
         )
         
-        # Speichere Deck-Matrix
+        # Save deck matrix
         output_file = os.path.join(args.embeddings_dir, 'deck_matrix.npy')
         np.save(output_file, deck_matrix)
         
-        print(f"\n✓ Deck-Matrix gespeichert: {output_file}")
+        print(f"\n✓ Deck matrix saved: {output_file}")
         print(f"  Shape: {deck_matrix.shape}")
         print(f"  (n_decks={deck_matrix.shape[0]}, n_cards={deck_matrix.shape[1]})")
 
 
 def cmd_train(args):
-    """Trainiert den Denoising Autoencoder"""
+    """Trains the denoising autoencoder"""
     print("=" * 70)
     print("STEP 4: Autoencoder Training")
     print("=" * 70)
     
-    # Lade Metadata
+    # Load metadata
     metadata_path = os.path.join(args.embeddings_dir, 'card_metadata.csv')
     metadata = pd.read_csv(metadata_path)
     n_cards = len(metadata)
-    print(f"\n✓ {n_cards:,} Karten geladen")
+    print(f"\n✓ {n_cards:,} cards loaded")
     
-    # Lade oder erstelle Deck-Daten
+    # Load or create deck data
     deck_matrix_path = os.path.join(args.embeddings_dir, 'deck_matrix.npy')
     
     if os.path.exists(deck_matrix_path) and not args.use_sample_data:
-        print(f"\nLade Deck-Matrix von {deck_matrix_path}...")
+        print(f"\nLoading deck matrix from {deck_matrix_path}...")
         deck_matrix = np.load(deck_matrix_path)
-        print(f"✓ {len(deck_matrix):,} Decks geladen")
+        print(f"✓ {len(deck_matrix):,} decks loaded")
     else:
         if args.use_sample_data:
-            print("\nErstelle Sample Deck-Daten für Demo...")
+            print("\nCreating sample deck data for demo...")
         else:
-            print(f"\n⚠ Keine Deck-Matrix gefunden in {deck_matrix_path}")
-            print("  Erstelle Sample Daten für Demo...")
+            print(f"\n⚠ No deck matrix found at {deck_matrix_path}")
+            print("  Creating sample data for demo...")
         
         deck_matrix = create_sample_deck_matrix(
             n_decks=args.n_sample_decks,
             n_cards=n_cards,
             deck_size=60
         )
-        print(f"✓ {len(deck_matrix)} Sample Decks erstellt")
+        print(f"✓ {len(deck_matrix)} sample decks created")
     
-    # Dataset und DataLoader
-    print(f"\nErstelle Dataset (noise_factor={args.noise_factor})...")
+    # Dataset and DataLoader
+    print(f"\nCreating dataset (noise_factor={args.noise_factor})...")
     dataset = DeckDataset(deck_matrix, noise_factor=args.noise_factor)
     train_loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
     
-    # Modell erstellen
-    print(f"\nErstelle Autoencoder (embedding_dim={args.embedding_dim})...")
+    # Create model
+    print(f"\nCreating autoencoder (embedding_dim={args.embedding_dim})...")
     model = DeckAutoencoder(
         n_cards=n_cards,
         embedding_dim=args.embedding_dim,
@@ -170,10 +170,10 @@ def cmd_train(args):
     )
     
     n_params = sum(p.numel() for p in model.parameters())
-    print(f"✓ Modell erstellt mit {n_params:,} Parametern")
+    print(f"✓ Model created with {n_params:,} parameters")
     
     # Training
-    print(f"\nStarte Training ({args.epochs} Epochs)...")
+    print(f"\nStarting training ({args.epochs} epochs)...")
     print("-" * 70)
     
     losses = train_autoencoder(
@@ -183,7 +183,7 @@ def cmd_train(args):
         lr=args.learning_rate
     )
     
-    # Speichere Modell
+    # Save model
     print("\n" + "-" * 70)
     output_path = os.path.join(args.embeddings_dir, 'deck_autoencoder.pth')
     torch.save({
@@ -193,33 +193,33 @@ def cmd_train(args):
         'losses': losses
     }, output_path)
     
-    print(f"\n✓ Modell gespeichert: {output_path}")
+    print(f"\n✓ Model saved: {output_path}")
     print(f"  Final Loss: {losses[-1]:.4f}")
     
     print("\n" + "=" * 70)
-    print("✓ Training abgeschlossen!")
+    print("✓ Training completed!")
     print("=" * 70)
 
 
 def cmd_recommend(args):
-    """Generiert Deck-Empfehlungen"""
+    """Generates deck recommendations"""
     print("=" * 70)
-    print("STEP 5: Deck-Empfehlungen")
+    print("STEP 5: Deck Recommendations")
     print("=" * 70)
     
-    # Lade Metadata
+    # Load metadata
     metadata_path = os.path.join(args.embeddings_dir, 'card_metadata.csv')
     metadata = pd.read_csv(metadata_path)
     
-    # Lade Modell
+    # Load model
     model_path = os.path.join(args.embeddings_dir, 'deck_autoencoder.pth')
     
     if not os.path.exists(model_path):
-        print(f"\n✗ Kein trainiertes Modell gefunden: {model_path}")
-        print("  Trainiere erst ein Modell mit: python src/main.py train")
+        print(f"\n✗ No trained model found: {model_path}")
+        print("  Train a model first with: python src/main.py train")
         return
     
-    print(f"\nLade Modell von {model_path}...")
+    print(f"\nLoading model from {model_path}...")
     checkpoint = torch.load(model_path, map_location='cpu')
     
     model = DeckAutoencoder(
@@ -227,48 +227,48 @@ def cmd_recommend(args):
         embedding_dim=checkpoint['embedding_dim']
     )
     model.load_state_dict(checkpoint['model_state_dict'])
-    print("✓ Modell geladen")
+    print("✓ Model loaded")
     
-    # Erstelle Recommender
+    # Create recommender
     recommender = DeckRecommender(model, metadata)
     
-    # Lade Deck oder erstelle leeres Deck
+    # Load deck or create empty deck
     if args.deck_file:
-        print(f"\nLade Deck von {args.deck_file}...")
+        print(f"\nLoading deck from {args.deck_file}...")
         loader = DeckLoader(metadata)
         partial_deck = loader.load_deck_from_file(args.deck_file)
         
-        # Zeige geladenes Deck
+        # Show loaded deck
         decklist = loader.vector_to_decklist(partial_deck, threshold=0.5)
-        print(f"\n✓ Deck geladen mit {len(decklist)} Karten:")
+        print(f"\n✓ Deck loaded with {len(decklist)} cards:")
         print(decklist[['name', 'manaCost', 'type']].to_string(index=False))
     else:
-        print("\nKein Deck angegeben - erstelle leeres Deck für allgemeine Empfehlungen")
+        print("\nNo deck provided - creating an empty deck for general recommendations")
         partial_deck = np.zeros(len(metadata), dtype=np.float32)
     
-    # Generiere Empfehlungen
-    print(f"\nGeneriere Top-{args.top_k} Empfehlungen...")
+    # Generate recommendations
+    print(f"\nGenerating top-{args.top_k} recommendations...")
     recommendations = recommender.recommend_cards(partial_deck, top_k=args.top_k)
     
     print("\n" + "=" * 70)
-    print("EMPFOHLENE KARTEN:")
+    print("RECOMMENDED CARDS:")
     print("=" * 70)
     print(recommendations.to_string(index=False))
     
-    # Speichere optional
+    # Optionally save
     if args.output:
         recommendations.to_csv(args.output, index=False)
-        print(f"\n✓ Empfehlungen gespeichert in: {args.output}")
+        print(f"\n✓ Recommendations saved to: {args.output}")
 
 
 def cmd_full_pipeline(args):
-    """Führt den kompletten Workflow aus"""
+    """Runs the full workflow"""
     print("=" * 70)
-    print("VOLLSTÄNDIGER WORKFLOW")
+    print("FULL WORKFLOW")
     print("=" * 70)
-    print("\nFühre alle Schritte automatisch aus...\n")
+    print("\nRunning all steps automatically...\n")
     
-    # Step 1: Indexierung
+    # Step 1: Indexing
     cmd_index_cards(args)
     print("\n")
     
@@ -281,12 +281,12 @@ def cmd_full_pipeline(args):
     cmd_train(args)
     print("\n")
     
-    # Step 4: Empfehlungen (optional)
+    # Step 4: Recommendations (optional)
     if args.show_recommendations:
         cmd_recommend(args)
     
     print("\n" + "=" * 70)
-    print("✓ KOMPLETTER WORKFLOW ABGESCHLOSSEN!")
+    print("✓ FULL WORKFLOW COMPLETED!")
     print("=" * 70)
 
 
@@ -295,90 +295,90 @@ def main():
         description='MTG Deck Recommendation System',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Beispiele:
-  # Alle Karten indexieren
+Examples:
+  # Index all cards
   python src/main.py index
   
-  # Nur 1000 Karten indexieren (zum Testen)
+  # Index only 1000 cards (for testing)
   python src/main.py index --limit 1000
   
-  # Beispiel-Decks erstellen
+  # Create sample decks
   python src/main.py create-samples
   
-  # Decks laden
+  # Load decks
   python src/main.py load-decks --deck-dir data/sample_decks
   
-  # Autoencoder trainieren
+  # Train the autoencoder
   python src/main.py train --epochs 50
   
-  # Empfehlungen für ein Deck
+  # Get recommendations for a deck
   python src/main.py recommend --deck-file data/sample_decks/mono_red.txt
   
-  # Kompletter Workflow
+  # Full workflow
   python src/main.py full-pipeline --limit 1000 --epochs 20
         """
     )
     
-    subparsers = parser.add_subparsers(dest='command', help='Verfügbare Befehle')
+    subparsers = parser.add_subparsers(dest='command', help='Available commands')
     
     # INDEX Command
-    index_parser = subparsers.add_parser('index', help='Indexiere MTG Karten')
+    index_parser = subparsers.add_parser('index', help='Index MTG cards')
     index_parser.add_argument('--db-path', default='data/AllPrintings.sqlite',
-                            help='Pfad zur SQLite Datenbank')
+                            help='Path to SQLite database')
     index_parser.add_argument('--limit', type=int, default=None,
-                            help='Max. Anzahl Karten (für Tests)')
+                            help='Max number of cards (for testing)')
     index_parser.add_argument('--batch-size', type=int, default=5000,
-                            help='Batch Size für Verarbeitung')
+                            help='Batch size for processing')
     index_parser.add_argument('--output-dir', default='data/embeddings',
-                            help='Output Verzeichnis')
+                            help='Output directory')
     index_parser.add_argument('--sample-vocab', type=int, default=10000,
-                            help='Sample Size für Vokabular')
+                            help='Sample size for vocabulary')
     
     # CREATE-SAMPLES Command
-    subparsers.add_parser('create-samples', help='Erstelle Beispiel Decks')
+    subparsers.add_parser('create-samples', help='Create sample decks')
     
     # LOAD-DECKS Command
-    load_parser = subparsers.add_parser('load-decks', help='Lade Deck-Daten')
+    load_parser = subparsers.add_parser('load-decks', help='Load deck data')
     load_parser.add_argument('--deck-dir', default='data/sample_decks',
-                           help='Verzeichnis mit Deck-Dateien')
+                           help='Directory with deck files')
     load_parser.add_argument('--embeddings-dir', default='data/embeddings',
-                           help='Verzeichnis mit Card Embeddings')
+                           help='Directory with card embeddings')
     load_parser.add_argument('--use-counts', action='store_true',
-                           help='Verwende Kartenanzahl statt Binary')
+                           help='Use card counts instead of binary')
     
     # TRAIN Command
-    train_parser = subparsers.add_parser('train', help='Trainiere Autoencoder')
+    train_parser = subparsers.add_parser('train', help='Train autoencoder')
     train_parser.add_argument('--embeddings-dir', default='data/embeddings',
-                            help='Verzeichnis mit Embeddings')
+                            help='Directory with embeddings')
     train_parser.add_argument('--epochs', type=int, default=50,
-                            help='Anzahl Training Epochs')
+                            help='Number of training epochs')
     train_parser.add_argument('--batch-size', type=int, default=16,
-                            help='Batch Size')
+                            help='Batch size')
     train_parser.add_argument('--learning-rate', type=float, default=0.001,
-                            help='Learning Rate')
+                            help='Learning rate')
     train_parser.add_argument('--embedding-dim', type=int, default=128,
-                            help='Latent Space Dimension')
+                            help='Latent space dimension')
     train_parser.add_argument('--noise-factor', type=float, default=0.2,
-                            help='Noise Factor für Denoising')
+                            help='Noise factor for denoising')
     train_parser.add_argument('--use-sample-data', action='store_true',
-                            help='Verwende generierte Sample-Daten')
+                            help='Use generated sample data')
     train_parser.add_argument('--n-sample-decks', type=int, default=100,
-                            help='Anzahl Sample Decks (wenn --use-sample-data)')
+                            help='Number of sample decks (when --use-sample-data)')
     
     # RECOMMEND Command
-    recommend_parser = subparsers.add_parser('recommend', help='Generiere Empfehlungen')
+    recommend_parser = subparsers.add_parser('recommend', help='Generate recommendations')
     recommend_parser.add_argument('--deck-file', type=str,
-                                help='Pfad zu Deck-Datei')
+                                help='Path to deck file')
     recommend_parser.add_argument('--embeddings-dir', default='data/embeddings',
-                                help='Verzeichnis mit Embeddings und Modell')
+                                help='Directory with embeddings and model')
     recommend_parser.add_argument('--top-k', type=int, default=10,
-                                help='Anzahl Empfehlungen')
+                                help='Number of recommendations')
     recommend_parser.add_argument('--output', type=str,
-                                help='Output Datei für Empfehlungen')
+                                help='Output file for recommendations')
     
     # FULL-PIPELINE Command
     pipeline_parser = subparsers.add_parser('full-pipeline', 
-                                          help='Führe kompletten Workflow aus')
+                                          help='Run the full workflow')
     pipeline_parser.add_argument('--db-path', default='data/AllPrintings.sqlite')
     pipeline_parser.add_argument('--limit', type=int, default=None)
     pipeline_parser.add_argument('--batch-size', type=int, default=5000)
@@ -391,9 +391,9 @@ Beispiele:
     pipeline_parser.add_argument('--use-sample-data', action='store_true')
     pipeline_parser.add_argument('--n-sample-decks', type=int, default=100)
     pipeline_parser.add_argument('--create-samples', action='store_true',
-                                help='Erstelle Beispiel-Decks')
+                                help='Create sample decks')
     pipeline_parser.add_argument('--show-recommendations', action='store_true',
-                                help='Zeige Empfehlungen am Ende')
+                                help='Show recommendations at the end')
     pipeline_parser.add_argument('--top-k', type=int, default=10)
     pipeline_parser.add_argument('--embeddings-dir', default='data/embeddings')
     pipeline_parser.add_argument('--deck-dir', default='data/sample_decks')

@@ -1,6 +1,6 @@
 """
 Deck Data Loader
-Hilfsfunktionen zum Laden und Verarbeiten von echten MTG Deck-Daten
+Helper functions for loading and processing real MTG deck data
 """
 
 import pandas as pd
@@ -11,12 +11,12 @@ import re
 
 
 class DeckLoader:
-    """Klasse zum Laden und Verarbeiten von MTG Deck-Daten"""
+    """Class for loading and processing MTG deck data"""
     
     def __init__(self, card_metadata: pd.DataFrame):
         """
         Args:
-            card_metadata: DataFrame mit Karteninformationen (uuid, name, setCode)
+            card_metadata: DataFrame with card information (uuid, name, setCode)
         """
         self.metadata = card_metadata
         self.card_name_to_idx = {name.lower(): idx for idx, name in enumerate(card_metadata['name'])}
@@ -24,14 +24,14 @@ class DeckLoader:
     
     def parse_decklist_text(self, decklist_text: str) -> List[Tuple[int, str]]:
         """
-        Parst eine Decklist im Standard-Format
-        
+        Parse a decklist in the standard format
+
         Format:
             4 Lightning Bolt
             2 Counterspell
-            
+
         Returns:
-            Liste von (count, card_name) Tupeln
+            List of (count, card_name) tuples
         """
         cards = []
         lines = decklist_text.strip().split('\n')
@@ -41,7 +41,7 @@ class DeckLoader:
             if not line or line.startswith('#') or line.startswith('//'):
                 continue
             
-            # Match "4 Card Name" oder "4x Card Name"
+            # Match "4 Card Name" or "4x Card Name"
             match = re.match(r'^(\d+)x?\s+(.+)$', line)
             if match:
                 count = int(match.group(1))
@@ -53,14 +53,14 @@ class DeckLoader:
     def decklist_to_vector(self, cards: List[Tuple[int, str]], 
                           use_counts: bool = False) -> np.ndarray:
         """
-        Konvertiert eine Decklist zu einem Binary/Count Vector
-        
+        Convert a decklist to a binary/count vector
+
         Args:
-            cards: Liste von (count, card_name) Tupeln
-            use_counts: Wenn True, verwende Anzahl; wenn False, nur Binary (0/1)
-        
+            cards: List of (count, card_name) tuples
+            use_counts: If True, use counts; if False, binary presence (0/1)
+
         Returns:
-            Vector der Gr├╢├ƒe n_cards
+            Vector of size n_cards
         """
         vector = np.zeros(self.n_cards, dtype=np.float32)
         
@@ -79,7 +79,7 @@ class DeckLoader:
         return vector
     
     def load_deck_from_file(self, filepath: str, use_counts: bool = False) -> np.ndarray:
-        """L├ñdt ein Deck aus einer Textdatei"""
+        """Load a deck from a text file"""
         with open(filepath, 'r', encoding='utf-8') as f:
             decklist_text = f.read()
         
@@ -89,8 +89,8 @@ class DeckLoader:
     def load_multiple_decks(self, filepaths: List[str], 
                            use_counts: bool = False) -> np.ndarray:
         """
-        L├ñdt mehrere Decks und gibt eine Matrix zur├╝ck
-        
+        Load multiple decks and return a matrix
+
         Returns:
             Matrix (n_decks, n_cards)
         """
@@ -107,8 +107,8 @@ class DeckLoader:
     
     def load_from_json(self, json_path: str, use_counts: bool = False) -> np.ndarray:
         """
-        L├ñdt Decks aus einer JSON-Datei
-        
+        Load decks from a JSON file
+
         Expected format:
         [
             {
@@ -134,14 +134,14 @@ class DeckLoader:
     
     def vector_to_decklist(self, vector: np.ndarray, threshold: float = 0.5) -> pd.DataFrame:
         """
-        Konvertiert einen Vector zur├╝ck zu einer Decklist
-        
+        Convert a vector back to a decklist
+
         Args:
             vector: Card vector (n_cards,)
-            threshold: Minimum Wert f├╝r eine Karte im Deck
-        
+            threshold: Minimum value for a card to be included in the deck
+
         Returns:
-            DataFrame mit Karten├╝bersicht
+            DataFrame with card overview
         """
         card_indices = np.where(vector >= threshold)[0]
         
@@ -158,12 +158,12 @@ class DeckLoader:
 
 
 def create_example_decklists():
-    """Erstellt Beispiel Deck-Dateien zum Testen"""
+    """Create example deck files for testing"""
     import os
     
     os.makedirs('data/sample_decks', exist_ok=True)
     
-    # Beispiel Deck 1: Mono Red Aggro
+    # Example Deck 1: Mono Red Aggro
     mono_red = """
 # Mono Red Aggro
 4 Lightning Bolt
@@ -181,7 +181,7 @@ def create_example_decklists():
 4 Ramunap Ruins
 """
     
-    # Beispiel Deck 2: Blue Control
+    # Example Deck 2: Blue Control
     blue_control = """
 # Blue Control
 4 Counterspell
@@ -205,39 +205,39 @@ def create_example_decklists():
     with open('data/sample_decks/blue_control.txt', 'w') as f:
         f.write(blue_control)
     
-    print("Beispiel Decks erstellt in data/sample_decks/")
+    print("Example decks created in data/sample_decks/")
 
 
 if __name__ == "__main__":
     print("=== Deck Loader Demo ===\n")
-    
-    # Lade Card Metadata
-    print("Lade Card Metadata...")
+
+    # Load card metadata
+    print("Loading card metadata...")
     metadata = pd.read_csv('data/embeddings/card_metadata.csv')
-    
-    # Erstelle DeckLoader
+
+    # Create DeckLoader
     loader = DeckLoader(metadata)
-    
-    # Erstelle Beispiel Decks
-    print("\nErstelle Beispiel Decklists...")
+
+    # Create example decks
+    print("\nCreating example decklists...")
     create_example_decklists()
-    
-    # Lade Beispiel Deck
-    print("\nLade Beispiel Deck...")
+
+    # Load example deck
+    print("\nLoading example deck...")
     try:
         deck_vector = loader.load_deck_from_file('data/sample_decks/mono_red.txt')
         print(f"Deck Vector Shape: {deck_vector.shape}")
-        print(f"Anzahl Karten im Deck: {int(deck_vector.sum())}")
-        
-        # Zeige Deck-Inhalt
+        print(f"Number of cards in deck: {int(deck_vector.sum())}")
+
+        # Show deck contents
         decklist = loader.vector_to_decklist(deck_vector, threshold=0.5)
-        print("\nDeck-Inhalt:")
+        print("\nDeck contents:")
         print(decklist.to_string(index=False))
     except FileNotFoundError:
-        print("Beispiel-Deck konnte nicht geladen werden.")
-    
-    print("\n=== Demo abgeschlossen ===")
-    print("\nNutzung:")
-    print("1. Erstelle Deck-Dateien im Standard-Format (siehe sample_decks/)")
-    print("2. Lade Decks mit DeckLoader")
-    print("3. Trainiere den Autoencoder mit echten Deck-Daten")
+        print("Example deck could not be loaded.")
+
+    print("\n=== Demo finished ===")
+    print("\nUsage:")
+    print("1. Create deck files in the standard format (see sample_decks/)")
+    print("2. Load decks with DeckLoader")
+    print("3. Train the autoencoder with real deck data")
