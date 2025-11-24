@@ -14,10 +14,10 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
-from torch.cuda.amp import autocast, GradScaler
 import numpy as np
 import pandas as pd
 from typing import Tuple, Optional
+import inspect
 
 
 def get_device(verbose: bool = True):
@@ -251,7 +251,19 @@ def train_autoencoder(model: DeckAutoencoder, train_loader: DataLoader,
     use_amp = use_amp and torch.cuda.is_available()
     if use_amp:
         print("Mixed Precision training enabled")
-        scaler = GradScaler()
+        # Use the new torch.amp.GradScaler API when available. Older PyTorch
+        # versions do not support the `device_type` keyword, so check the
+        # constructor signature and fall back to the parameter-less form.
+        device_type = 'cuda' if torch.cuda.is_available() else 'cpu'
+        try:
+            params = inspect.signature(torch.amp.GradScaler.__init__).parameters
+            if 'device_type' in params:
+                scaler = torch.amp.GradScaler(device_type=device_type)
+            else:
+                scaler = torch.amp.GradScaler()
+        except (ValueError, TypeError):
+            # If signature inspection fails for any reason, fall back
+            scaler = torch.amp.GradScaler()
 
     # Use numerically stable variant that expects logits
     criterion = nn.BCEWithLogitsLoss()
@@ -275,7 +287,9 @@ def train_autoencoder(model: DeckAutoencoder, train_loader: DataLoader,
 
             if use_amp:
                 # Mixed precision training
-                with autocast():
+                # Use the new `torch.amp.autocast` and pass the device type
+                # to avoid the deprecated `torch.cuda.amp.autocast` API.
+                with torch.amp.autocast(device_type=device_type):
                     reconstructed = model(noisy_deck)
                     loss = criterion(reconstructed, clean_deck)
 
