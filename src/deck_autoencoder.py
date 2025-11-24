@@ -15,13 +15,13 @@ from typing import Tuple, Optional
 
 
 class DeckDataset(Dataset):
-    """Dataset f├╝r MTG Decks"""
+    """Dataset für MTG Decks"""
     
     def __init__(self, deck_matrices: np.ndarray, noise_factor: float = 0.2):
         """
         Args:
             deck_matrices: Binary matrix (n_decks, n_cards) wo 1 = Karte ist im Deck
-            noise_factor: Anteil der Karten die f├╝r Denoising entfernt werden
+            noise_factor: Anteil der Karten die für Denoising entfernt werden
         """
         self.decks = torch.FloatTensor(deck_matrices)
         self.noise_factor = noise_factor
@@ -41,7 +41,7 @@ class DeckDataset(Dataset):
 
 
 class DeckAutoencoder(nn.Module):
-    """Denoising Autoencoder f├╝r MTG Decks"""
+    """Denoising Autoencoder für MTG Decks"""
     
     def __init__(self, n_cards: int, embedding_dim: int = 128, 
                  hidden_dims: list = [1024, 512, 256]):
@@ -103,7 +103,7 @@ class DeckAutoencoder(nn.Module):
 
 
 class DeckRecommender:
-    """Wrapper f├╝r das trainierte Modell f├╝r Deck-Empfehlungen"""
+    """Wrapper für das trainierte Modell für Deck-Empfehlungen"""
     
     def __init__(self, model: DeckAutoencoder, card_metadata: pd.DataFrame):
         self.model = model
@@ -113,10 +113,10 @@ class DeckRecommender:
     
     def recommend_cards(self, partial_deck: np.ndarray, top_k: int = 10) -> pd.DataFrame:
         """
-        Empfiehlt Karten basierend auf einem unvollst├ñndigen Deck
+        Empfiehlt Karten basierend auf einem unvollständigen Deck
         
         Args:
-            partial_deck: Binary vector (n_cards,) mit 1 f├╝r vorhandene Karten
+            partial_deck: Binary vector (n_cards,) mit 1 für vorhandene Karten
             top_k: Anzahl der Empfehlungen
         
         Returns:
@@ -146,7 +146,7 @@ class DeckRecommender:
     def find_similar_decks(self, deck: np.ndarray, all_decks: np.ndarray, 
                           top_k: int = 5) -> np.ndarray:
         """
-        Findet ├ñhnliche Decks basierend auf Latent Space Distance
+        Findet ähnliche Decks basierend auf Latent Space Distance
         
         Args:
             deck: Binary vector des Referenz-Decks
@@ -176,8 +176,8 @@ class DeckRecommender:
 def create_sample_deck_matrix(n_decks: int, n_cards: int, 
                              deck_size: int = 60) -> np.ndarray:
     """
-    Erstellt Sample Deck Daten f├╝r Tests
-    In der Praxis w├╝rden hier echte Deck-Listen geladen werden
+    Erstellt Sample Deck Daten für Tests
+    In der Praxis würden hier echte Deck-Listen geladen werden
     """
     deck_matrix = np.zeros((n_decks, n_cards), dtype=np.float32)
     
