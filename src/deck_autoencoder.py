@@ -311,36 +311,36 @@ def train_autoencoder(model: DeckAutoencoder, train_loader: DataLoader,
 
 if __name__ == "__main__":
     print("=" * 60)
-    print("MTG Deck Autoencoder - GPU-beschleunigtes Training")
+    print("MTG Deck Autoencoder - GPU-accelerated Training")
     print("=" * 60)
     print()
-    
-    # Device ermitteln
+
+    # Determine device
     device = get_device(verbose=True)
     print()
-    
-    # Lade Embeddings
-    print("Lade Card Embeddings...")
+
+    # Load embeddings
+    print("Loading card embeddings...")
     embeddings = np.load('data/embeddings/card_embeddings.npy')
     metadata = pd.read_csv('data/embeddings/card_metadata.csv')
     n_cards = len(metadata)
     
-    print(f"Anzahl Karten: {n_cards}")
-    
-    # Erstelle Sample Deck Daten
-    # In der Praxis: Lade echte Deck-Listen hier
-    print("\nErstelle Sample Deck Daten...")
-    n_decks = 1000  # Mehr Decks f├╝r besseres Training
+    print(f"Number of cards: {n_cards}")
+
+    # Create sample deck data
+    # In practice: load real deck lists here
+    print("\nCreating sample deck data...")
+    n_decks = 1000  # More decks for better training
     deck_matrix = create_sample_deck_matrix(n_decks, n_cards, deck_size=60)
-    print(f"Anzahl Sample Decks: {n_decks}")
-    
-    # Dataset und DataLoader mit GPU-Optimierungen
+    print(f"Number of sample decks: {n_decks}")
+
+    # Dataset and DataLoader with GPU optimizations
     dataset = DeckDataset(deck_matrix, noise_factor=0.2)
     
-    # Gr├Â├čere Batch Size f├╝r GPU, kleinere f├╝r CPU
+    # Larger batch size for GPU, smaller for CPU
     batch_size = 64 if torch.cuda.is_available() else 16
-    
-    # pin_memory und num_workers f├╝r schnelleren GPU-Transfer
+
+    # pin_memory and num_workers for faster GPU transfer
     train_loader = DataLoader(
         dataset, 
         batch_size=batch_size, 
@@ -350,7 +350,7 @@ if __name__ == "__main__":
     )
     
     # Modell erstellen
-    print("\nErstelle Autoencoder Modell...")
+    print("\nCreating autoencoder model...")
     model = DeckAutoencoder(
         n_cards=n_cards,
         embedding_dim=128,
@@ -358,8 +358,8 @@ if __name__ == "__main__":
     )
     
     n_params = sum(p.numel() for p in model.parameters())
-    print(f"Modell Parameter: {n_params:,}")
-    print(f"Modell Gr├Â├če: ~{n_params * 4 / 1e6:.1f} MB (FP32)")
+    print(f"Model parameters: {n_params:,}")
+    print(f"Model size: ~{n_params * 4 / 1e6:.1f} MB (FP32)")
     
     # Training mit GPU-Unterst├╝tzung
     losses = train_autoencoder(
@@ -367,12 +367,12 @@ if __name__ == "__main__":
         train_loader, 
         n_epochs=50,  # Mehr Epochen da wir GPU haben
         lr=0.001,
-        use_amp=True,  # Mixed Precision f├╝r schnelleres Training
+        use_amp=True,  # Mixed precision for faster training
         device=device
     )
     
     # Speichere Modell
-    print("\nSpeichere trainiertes Modell...")
+    print("\nSaving trained model...")
     torch.save({
         'model_state_dict': model.state_dict(),
         'n_cards': n_cards,
@@ -381,10 +381,10 @@ if __name__ == "__main__":
     }, 'data/embeddings/deck_autoencoder.pth')
     
     print("\n" + "=" * 60)
-    print("Training abgeschlossen!")
+    print("Training completed!")
     print("=" * 60)
-    print("\nN├ñchste Schritte:")
-    print("1. Lade echte Deck-Daten (z.B. von MTGO, Arena, oder Turnieren)")
-    print("2. Trainiere das Modell mit echten Decks")
-    print("3. Nutze DeckRecommender f├╝r Empfehlungen")
-    print(f"4. Modell gespeichert unter: data/embeddings/deck_autoencoder.pth")
+    print("\nNext steps:")
+    print("1. Load real deck data (e.g., from MTGO, Arena, or tournaments)")
+    print("2. Train the model with real decks")
+    print("3. Use DeckRecommender for recommendations")
+    print(f"4. Model saved at: data/embeddings/deck_autoencoder.pth")

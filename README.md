@@ -1,89 +1,89 @@
 # MTG Deck Recommendation System
 
-Ein Machine Learning basiertes Empfehlungssystem für Magic: The Gathering Decks, das Denoising Autoencoder verwendet, um Deck-Vorschläge zu generieren.
+A machine learning-based recommendation system for Magic: The Gathering decks that uses Denoising Autoencoders to generate deck suggestions.
 
-## Übersicht
+## Overview
 
-Dieses System:
-1. **Indexiert** Magic Karten aus der AllPrintings.sqlite Datenbank als numerische Vektoren
-2. **Trainiert** einen Denoising Autoencoder mit Pro-Deck-Daten
-3. **Empfiehlt** Karten basierend auf unvollständigen Decks
+This system:
+1. **Indexes** Magic cards from the AllPrintings.sqlite database as numerical vectors
+2. **Trains** a Denoising Autoencoder with Pro Deck data
+3. **Recommends** cards based on incomplete decks
 
 ## Features
 
-- 🎴 **Card Embedding System**: Extrahiert 32 Features pro Karte (Mana Cost, Colors, Types, Power/Toughness, etc.)
-- 🧠 **Denoising Autoencoder**: Lernt Deck-Archetypen und Synergien
-- 📊 **Deck Analysis**: Findet ähnliche Decks basierend auf Latent Space Distance
-- 🔍 **Card Recommendations**: Schlägt passende Karten für unvollständige Decks vor
+- 🎴 **Card Embedding System**: Extracts 32 features per card (Mana Cost, Colors, Types, Power/Toughness, etc.)
+- 🧠 **Denoising Autoencoder**: Learns deck archetypes and synergies
+- 📊 **Deck Analysis**: Finds similar decks based on Latent Space Distance
+- 🔍 **Card Recommendations**: Suggests suitable cards for incomplete decks
 
-## Schnellstart
+## Quick Start
 
 ### 1. Installation
 
 ```bash
-# Virtual Environment erstellen (falls noch nicht vorhanden)
+# Create virtual environment (if not already created)
 python -m venv .venv
 source .venv/bin/activate  # macOS/Linux
 
-# Dependencies installieren
+# Install dependencies
 pip install -r requirements.txt
 ```
 
-### 2. Karten indexieren
+### 2. Index cards
 
 ```bash
-# Test mit 1000 Karten
+# Test with 1000 cards
 python src/index_cards.py --limit 1000
 
-# Alle Karten indexieren (~107.000 Karten, dauert ~2 Minuten)
+# Index all cards (~107,000 cards, takes ~2 minutes)
 python src/index_cards.py
 ```
 
-### 3. Deck-Daten vorbereiten
+### 3. Prepare deck data
 
 ```bash
-# Beispiel Decks erstellen (zum Testen)
+# Create example decks (for testing)
 python src/deck_loader.py
 
-# Eigene Decks im Format erstellen:
+# Create your own decks in this format:
 # data/decks/my_deck.txt:
 # 4 Lightning Bolt
 # 4 Monastery Swiftspear
 # ...
 ```
 
-### 4. Autoencoder trainieren
+### 4. Train Autoencoder
 
 ```bash
-# Demo mit Sample-Daten
+# Demo with sample data
 python src/deck_autoencoder.py
 ```
 
-## Projekt-Struktur
+## Project Structure
 
 ```
 mtg-deck-recommendation/
 ├── data/
-│   ├── AllPrintings.sqlite          # MTG JSON Datenbank
-│   ├── embeddings/                   # Generierte Card Embeddings
+│   ├── AllPrintings.sqlite          # MTG JSON Database
+│   ├── embeddings/                   # Generated Card Embeddings
 │   │   ├── card_embeddings.npy
 │   │   ├── card_metadata.csv
 │   │   └── feature_names.txt
-│   └── sample_decks/                 # Beispiel Deck-Listen
+│   └── sample_decks/                 # Example Deck Lists
 ├── src/
 │   ├── main.py                       # Original Script
 │   ├── card_embeddings.py            # Card Embedding Generator
-│   ├── index_cards.py                # Indexierungs-Script
-│   ├── deck_autoencoder.py           # Autoencoder Modell
-│   └── deck_loader.py                # Deck-Daten Loader
+│   ├── index_cards.py                # Indexing Script
+│   ├── deck_autoencoder.py           # Autoencoder Model
+│   └── deck_loader.py                # Deck Data Loader
 ├── requirements.txt
 ├── README.md
-└── EMBEDDING_README.md               # Detaillierte Embedding-Doku
+└── EMBEDDING_README.md               # Detailed Embedding Documentation
 ```
 
-## Verwendung
+## Usage
 
-### Karten indexieren
+### Index cards
 
 ```python
 from src.card_embeddings import MTGCardEmbedder
@@ -93,7 +93,7 @@ embeddings, metadata = embedder.process_all_cards(limit=1000)
 embedder.save_embeddings(embeddings, metadata)
 ```
 
-### Decks laden
+### Load decks
 
 ```python
 from src.deck_loader import DeckLoader
@@ -102,37 +102,37 @@ import pandas as pd
 metadata = pd.read_csv('data/embeddings/card_metadata.csv')
 loader = DeckLoader(metadata)
 
-# Einzelnes Deck laden
+# Load single deck
 deck_vector = loader.load_deck_from_file('data/sample_decks/mono_red.txt')
 
-# Mehrere Decks laden
+# Load multiple decks
 deck_files = ['deck1.txt', 'deck2.txt', 'deck3.txt']
 deck_matrix = loader.load_multiple_decks(deck_files)
 ```
 
-### Deck-Empfehlungen erhalten
+### Get deck recommendations
 
 ```python
 from src.deck_autoencoder import DeckRecommender
 import torch
 
-# Modell laden
+# Load model
 checkpoint = torch.load('data/embeddings/deck_autoencoder.pth')
 model = DeckAutoencoder(n_cards=checkpoint['n_cards'])
 model.load_state_dict(checkpoint['model_state_dict'])
 
-# Recommender erstellen
+# Create recommender
 recommender = DeckRecommender(model, metadata)
 
-# Empfehlungen für unvollständiges Deck
+# Get recommendations for incomplete deck
 partial_deck = loader.load_deck_from_file('my_partial_deck.txt')
 recommendations = recommender.recommend_cards(partial_deck, top_k=10)
 print(recommendations)
 ```
 
-## Extrahierte Features
+## Extracted Features
 
-Jede Karte wird in einen **32-dimensionalen** Vektor umgewandelt:
+Each card is converted to a **32-dimensional** vector:
 
 - **Mana Cost** (7): Generic, W, U, B, R, G, C
 - **Mana Value** (1): CMC
@@ -142,22 +142,22 @@ Jede Karte wird in einen **32-dimensionalen** Vektor umgewandelt:
 - **Rarity** (4): Common, Uncommon, Rare, Mythic
 - **Other** (3): Keyword Count, Reserved, Alt Deck Limit
 
-Details siehe [EMBEDDING_README.md](EMBEDDING_README.md)
+See [EMBEDDING_README.md](EMBEDDING_README.md) for details
 
 ## Performance
 
-- **Indexierung**: ~1500 Karten/Sekunde
-- **Vollständige Indexierung**: ~90 Sekunden für 107.000 Karten
-- **Speicherbedarf**: ~14MB für alle Card Embeddings
+- **Indexing**: ~1500 cards/second
+- **Full indexing**: ~90 seconds for 107,000 cards
+- **Memory requirement**: ~14MB for all card embeddings
 
-## Nächste Schritte
+## Next Steps
 
-1. ✅ Card Embeddings erstellen
-2. ✅ Denoising Autoencoder implementieren
-3. ⏳ Echte Pro-Deck Daten sammeln
-4. ⏳ Modell mit echten Daten trainieren
-5. ⏳ Web-Interface für Deck-Empfehlungen
+1. ✅ Create card embeddings
+2. ✅ Implement Denoising Autoencoder
+3. ⏳ Collect real Pro Deck data
+4. ⏳ Train model with real data
+5. ⏳ Build web interface for deck recommendations
 
-## Lizenz
+## License
 
-Siehe LICENSE Datei
+See LICENSE file

@@ -1,19 +1,17 @@
 # MTG Card Embedding Indexer
 
-Dieses System erstellt Vektorrepräsentationen (Embeddings) von Magic The Gathering Karten aus der AllPrintings.sqlite Datenbank, um sie für Machine Learning Modelle wie Denoising Autoencoder nutzbar zu machen.
+This system creates vector representations (embeddings) of Magic The Gathering cards from the AllPrintings.sqlite database to make them usable for machine learning models like Denoising Autoencoders.
 
-## Übersicht
+## Overview
 
-Das System extrahiert relevante Features aus jeder Karte und erstellt numerische Vektoren, die für:
-- Denoising Autoencoder Training
-- Deck-Empfehlungssysteme
-- Kartensuche und Ähnlichkeitsanalysen
+The system extracts relevant features from each card and creates numerical vectors that can be used for:
+- Denoising Autoencoder training
+- Deck recommendation systems
+- Card search and similarity analysis
 
-genutzt werden können.
+## Extracted Features
 
-## Extrahierte Features
-
-Jede Karte wird in einen **33-dimensionalen** Feature-Vektor umgewandelt:
+Each card is converted to a **33-dimensional** feature vector:
 
 ### 1. Mana Cost Features (7)
 - Generic Mana
@@ -24,7 +22,7 @@ Jede Karte wird in einen **33-dimensionalen** Feature-Vektor umgewandelt:
 - Converted Mana Cost (CMC)
 
 ### 3. Color Identity (6)
-- One-hot Encoding für W, U, B, R, G, Colorless
+- One-hot Encoding for W, U, B, R, G, Colorless
 
 ### 4. Card Types (8)
 - Binary Features: Creature, Instant, Sorcery, Enchantment, Artifact, Planeswalker, Land, Battle
@@ -32,12 +30,12 @@ Jede Karte wird in einen **33-dimensionalen** Feature-Vektor umgewandelt:
 ### 5. Combat Stats (3)
 - Power
 - Toughness
-- Loyalty (f├╝r Planeswalker)
+- Loyalty (for Planeswalkers)
 
 ### 6. Rarity (4)
 - Common, Uncommon, Rare, Mythic
 
-### 7. Weitere Features (4)
+### 7. Additional Features (4)
 - Keyword Count
 - Is Reserved
 - Has Alternative Deck Limit
@@ -45,71 +43,71 @@ Jede Karte wird in einen **33-dimensionalen** Feature-Vektor umgewandelt:
 ## Installation
 
 ```bash
-# Dependencies installieren
+# Install dependencies
 pip install -r requirements.txt
 ```
 
-## Verwendung
+## Usage
 
-### Schnellstart - Test mit 1000 Karten
+### Quick Start - Test with 1000 cards
 
 ```bash
 python src/index_cards.py --limit 1000
 ```
 
-### Alle Karten indexieren (~107.000 Karten)
+### Index all cards (~107,000 cards)
 
 ```bash
 python src/index_cards.py
 ```
 
-### Weitere Optionen
+### Additional Options
 
 ```bash
 python src/index_cards.py --help
 
-# Beispiele:
+# Examples:
 python src/index_cards.py --limit 5000 --batch-size 1000
 python src/index_cards.py --output-dir data/my_embeddings
 ```
 
 ## Output
 
-Das System erstellt folgende Dateien im `data/embeddings/` Verzeichnis:
+The system creates the following files in the `data/embeddings/` directory:
 
-1. **card_embeddings.npy** - Numpy Array mit allen Embedding-Vektoren
+1. **card_embeddings.npy** - Numpy array with all embedding vectors
 2. **card_metadata.csv** - Metadata (UUID, Name, Set, etc.)
-3. **feature_names.txt** - Namen aller Features
+3. **feature_names.txt** - Names of all features
 
-## Embeddings Laden und Verwenden
+## Loading and Using Embeddings
 
 ```python
 from card_embeddings import MTGCardEmbedder
 import numpy as np
 import pandas as pd
 
-# Embeddings laden
+# Load embeddings
 embeddings = np.load('data/embeddings/card_embeddings.npy')
 metadata = pd.read_csv('data/embeddings/card_metadata.csv')
 
 print(f"Shape: {embeddings.shape}")  # (n_cards, 33)
-print(f"Erste Karte: {metadata.iloc[0]['name']}")
+print(f"First card: {metadata.iloc[0]['name']}")
 print(f"Embedding: {embeddings[0]}")
 ```
 
-## Nächste Schritte: Denoising Autoencoder
+## Next Steps: Denoising Autoencoder
 
-Die erstellten Embeddings können für einen Denoising Autoencoder verwendet werden:
+The created embeddings can be used for a Denoising Autoencoder:
 
-1. **Deck-Daten sammeln**: Lade fertige Pro-Decks (z.B. von MTGO, Arena, oder Tournament-Daten)
-2. **Deck-Matrix erstellen**: Erstelle binäre Vektoren die repräsentieren welche Karten in einem Deck sind
-3. **Autoencoder trainieren**: 
-   - Input: Deck-Vektor mit "Noise"
-   - Output: Originales Deck
-   - Latent Space lernt Deck-Archetypen
-4. **Deck-Empfehlungen**: Nutze den Decoder um fehlende Karten vorzuschlagen
+1. **Collect deck data**: Load ready-made pro-decks (e.g., from MTGO, Arena, or tournament data)
+2. **Create deck matrix**: Create binary vectors representing which cards are in a deck
+3. **Train Autoencoder**: 
+   - Input: Deck vector with "noise"
+   - Output: Original deck
+   - Latent space learns deck archetypes
+4. **Deck recommendations**: Use the decoder to suggest missing cards
 
-### Beispiel Autoencoder Architektur
+### Example Autoencoder Architecture
 
 ```python
 import torch
@@ -148,20 +146,20 @@ class DeckAutoencoder(nn.Module):
 
 ## Performance
 
-- **Verarbeitungsgeschwindigkeit**: ~1000-2000 Karten/Sekunde
-- **Speicherbedarf**: ~14MB f├╝r 107.000 Karten (float32)
-- **Vollständige Indexierung**: ~60-120 Sekunden
+- **Processing speed**: ~1000-2000 cards/second
+- **Memory requirement**: ~14MB for 107,000 cards (float32)
+- **Complete indexing**: ~60-120 seconds
 
-## Datenbank Schema
+## Database Schema
 
-Die Daten stammen aus der MTG JSON AllPrintings.sqlite Datenbank:
+Data comes from the MTG JSON AllPrintings.sqlite database:
 - Download: https://mtgjson.com/downloads/all-files/
-- Version: Aktuelle AllPrintings.sqlite
+- Version: Current AllPrintings.sqlite
 
-## Lizenz
+## License
 
-Siehe LICENSE Datei.
+See LICENSE file.
 
-## Beitragende
+## Contributors
 
-Erstellt f├╝r MTG Deck Recommendation System.
+Created for MTG Deck Recommendation System.
