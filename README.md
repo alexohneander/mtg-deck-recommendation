@@ -1,1 +1,1 @@
-# mtg-deck-recommendation
+# MTG Deck recommendation
